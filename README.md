@@ -28,6 +28,11 @@ An example policy that limits the deploy user to only the actions necessary for 
 Notes about deployment behavior
 
 - The `main` workflow (runs on `push` to `main`) builds, lints, tests, packages a zip artifact, deploys to the `serverless-ci-cd-api-staging` Lambda (create or update), ensures a public Lambda Function URL exists, and then runs integration tests against that URL.
+
+Serverless license configuration
+
+- A placeholder `.serverlessrc` file is included at the repository root. It contains a placeholder license key.
+- For CI/CD you should set the repository secret `SLS_LICENSE_KEY` to your real Serverless Framework license key. The workflows will write `~/.serverlessrc` automatically from that secret before running `serverless` commands.
 - The `promote` workflow triggers on new semantic Git tags like `v1.2.3`. It runs the packaging steps again in the tag context and deploys to `serverless-ci-cd-api-prod` in the `production` environment (which can enforce manual approvals).
 - For security, the workflows use `aws-actions/configure-aws-credentials@v2` and rely on the narrowed IAM policy for the deploy user. For first-time creation of a Lambda, you must provide a Lambda execution role ARN via the `LAMBDA_STAGING_ROLE_ARN` or `LAMBDA_PRODUCTION_ROLE_ARN` secrets.
 
@@ -59,3 +64,8 @@ Notes
 
 - For production use, narrow the IAM permissions to the minimal needed actions rather than `AWSLambdaFullAccess`.
 - If you prefer native AWS CLI deployment, replace the Serverless steps in the workflow with packaging + `aws lambda` CLI commands.
+
+Where to put your real Serverless license key
+
+- Locally: replace the placeholder value inside `.serverlessrc` with your real key.
+- In GitHub Actions: add the secret `SLS_LICENSE_KEY` (Settings → Secrets → Actions) — the workflows will write it to `$HOME/.serverlessrc` automatically.

@@ -1,0 +1,2 @@
+$key = Read-Host "Paste your Serverless license key now and press Enter"
+Set-Content -Path "$env:USERPROFILE\.serverlessrc" -Value ("{\"licenseKey\":\"$key\"}") -Encoding utf8

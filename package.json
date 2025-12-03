@@ -1,20 +1,24 @@
 {
-  "name": "serverless-ci-cd-api",
+  "name": "advanced-devsecops-api",
   "version": "1.0.0",
-  "description": "A simple API for CI/CD demonstration.",
+  "description": "Advanced DevSecOps CI/CD Serverless Lambda Deployment with Automated Testing and Non-Interactive Serverless CLI",
   "main": "index.js",
   "scripts": {
-    "test": "node index.test.js",
-    "lint": "echo 'Skipping linting for brevity...'"
+    "lint": "eslint .",
+    "test": "jest",
+    "build": "echo \"No build step required\"",
+    "package": "cross-env SLS_INTERACTIVE_DISABLED=1 SLS_TELEMETRY_DISABLED=1 npx serverless package",
+    "deploy": "cross-env SLS_INTERACTIVE_DISABLED=1 SLS_TELEMETRY_DISABLED=1 npx serverless deploy",
+    "start": "node index.js"
   },
-  "keywords": [
-    "lambda",
-    "serverless",
-    "ci/cd"
-  ],
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
-    "jest": "^29.7.0"
+    "cross-env": "^7.0.3",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "serverless": "^3.40.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "verbose": true
   }
 }
