@@ -1,46 +1,15 @@
-name: Promote Staging → Production
+name: Promote Preview to Production
 
 on:
   workflow_dispatch:
 
-permissions:
-  contents: read
-  id-token: write
-  actions: read
-
 jobs:
   promote:
-    name: Promote to production
     runs-on: ubuntu-latest
-    environment: production
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Install Vercel CLI
+        run: npm install -g vercel
 
-      - name: Setup Node 18
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Install Serverless CLI
-        run: |
-          npm install -g serverless
-          serverless --version
-
-      - name: Debug env presence
-        run: |
-          echo "SERVERLESS_ACCESS_KEY present? " && [ -n "$SERVERLESS_ACCESS_KEY" ] && echo "YES" || echo "NO"
-        env:
-          SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
-
-      - name: Deploy to production
-        env:
-          SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
-          # AWS secrets if required:
-          # AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          # AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: |
-          set -e
-          echo "Running: serverless deploy --stage production"
-          serverless deploy --stage production
+      - name: Promote latest preview deployment to production
+        run: vercel promote --token=${{ secrets.VERCEL_TOKEN }}
