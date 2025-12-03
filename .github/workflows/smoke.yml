@@ -1,0 +1,29 @@
+﻿name: Smoke test - confirm Actions runs
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Print debug info
+        run: |
+          echo "GITHUB_REPOSITORY = "
+          echo "GITHUB_REF = "
+          echo "GITHUB_SHA = "
+          echo "Listing root files:"
+          ls -la
+          echo "cat package.json (first 40 lines):"
+          head -n 40 package.json || true

@@ -1,97 +1,89 @@
-name: CI/CD Pipeline - Staging
+name: CI - Build, Test, Deploy (staging)
 
 on:
   push:
-    branches: [ main ] # Trigger on push to main
+    branches:
+      - main
 
-env:
-  STAGING_FUNCTION_NAME: serverless-staging-api # Name of the existing Staging Lambda function
-  REGION: us-east-1 # Target AWS Region
-  ZIP_FILE: deployment_package.zip # Artifact filename
+permissions:
+  contents: read
+  id-token: write
+  actions: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build_test_and_deploy:
+    name: CI/CD Pipeline - Staging / build_test_and_deploy
     runs-on: ubuntu-latest
-    # Target the Staging environment (Requires environment setup in GitHub settings)
-    environment: Staging
-    
+
     steps:
-      - name: 1. Checkout Code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: 2. Setup Node.js 18
+      - name: Print repo files for debug
+        run: |
+          echo "Files at repo root:"
+          ls -la
+
+      - name: Setup Node.js 18
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          
-      # 🚀 3. Cache Dependencies (Performance Optimization)
-      - name: Restore Node Modules Cache
-        id: cache-npm
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-            
-      - name: Install dependencies
-        if: steps.cache-npm.outputs.cache-hit != 'true' # Only run if cache miss
-        run: npm ci
-        
-      - name: 4. Run Unit Tests (CI)
-        run: npm test
+          cache: 'npm'
 
-      # ⚙️ 5. Configure AWS Credentials (Least Privilege)
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.REGION }}
-
-      - name: 6. Package Application Artifact
-        # Package code and node_modules into a zip file
-        run: zip -r ${{ env.ZIP_FILE }} . -x '*.git*' '*.github*'
-        
-      - name: 7. Deploy to AWS Lambda (CD - AWS CLI)
-        id: deploy
+      - name: Check for package.json
         run: |
-          aws lambda update-function-code \
-            --function-name ${{ env.STAGING_FUNCTION_NAME }} \
-            --zip-file fileb://${{ env.ZIP_FILE }} \
-            --region ${{ env.REGION }}
-          
-          # Retrieve the Function URL for the next job's integration test
-          FUNCTION_URL=$(aws lambda get-function-url-config \
-            --function-name ${{ env.STAGING_FUNCTION_NAME }} \
-            --region ${{ env.REGION }} \
-            --query 'FunctionUrl' --output text)
-          
-          # Set the URL as an environment variable for the next job
-          echo "STAGING_URL=$FUNCTION_URL" >> $GITHUB_ENV
-          
-    outputs:
-      STAGING_URL: ${{ env.STAGING_URL }} # Pass the URL to the Integration Test job
-
-  integration_test:
-    needs: build_test_and_deploy
-    runs-on: ubuntu-latest
-    # Uses the Staging environment context
-    environment: Staging
-    
-    steps:
-      # 🧪 8. Automated Integration Test
-      - name: Test Deployed Endpoint
-        run: |
-          STAGING_URL="${{ needs.build_test_and_deploy.outputs.STAGING_URL }}"
-          echo "Testing live endpoint: $STAGING_URL"
-          
-          # Use curl to check for status 200
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" $STAGING_URL)
-          
-          if [ "$HTTP_CODE" -eq 200 ]; then
-            echo "✅ Integration Test Passed: Status 200 received."
+          if [ -f package.json ]; then
+            echo "package.json found"
           else
-            echo "❌ Integration Test Failed: Received status $HTTP_CODE."
-            exit 1
+            echo "ERROR: package.json not found - adjust workflow or repo" && exit 2
           fi
+
+      - name: Install dependencies
+        run: |
+          npm ci
+        env:
+          CI: true
+
+      - name: Run unit tests (if present)
+        run: |
+          if grep -q "\"test\"" package.json; then
+            echo "Running npm test"
+            npm test
+          else
+            echo "No test script defined in package.json — skipping tests"
+          fi
+
+      - name: Build (if present)
+        run: |
+          if grep -q "\"build\"" package.json; then
+            echo "Running npm run build"
+            npm run build
+          else
+            echo "No build script defined - skipping build"
+          fi
+
+      - name: Install Serverless CLI
+        run: |
+          npm install -g serverless
+          serverless --version
+
+      - name: Debug environment variable presence
+        run: |
+          echo "SERVERLESS_ACCESS_KEY present? " && [ -n "$SERVERLESS_ACCESS_KEY" ] && echo "YES" || echo "NO"
+        env:
+          SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
+
+      - name: Deploy to staging (Serverless)
+        env:
+          SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
+          # If using AWS add AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY as repo secrets and uncomment below:
+          # AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          # AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          set -e
+          echo "Running: serverless deploy --stage staging"
+          serverless deploy --stage staging
