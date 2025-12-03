@@ -1,10 +1,13 @@
-// index.js
-module.exports.handler = async () => {
+﻿module.exports.handler = async function (event, context) {
   return {
     statusCode: 200,
+    headers: { "content-type": "application/json" },
     body: JSON.stringify({
-      message: "API deployed successfully",
-      timestamp: new Date().toISOString()
+      message: "Hello from Lambda handler!",
+      method: event.httpMethod,
+      path: event.path,
+      query: event.queryStringParameters || {},
+      receivedBody: event.body || null
     })
   };
 };

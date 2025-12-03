@@ -1,24 +1,10 @@
-{
-  "name": "advanced-devsecops-api",
+﻿{
+  "name": "serverless-api-clean",
   "version": "1.0.0",
-  "description": "Advanced DevSecOps CI/CD Serverless Lambda Deployment with Automated Testing and Non-Interactive Serverless CLI",
+  "description": "Minimal serverless adapter for Vercel + Lambda handler",
   "main": "index.js",
   "scripts": {
-    "lint": "eslint .",
-    "test": "jest",
-    "build": "echo \"No build step required\"",
-    "package": "cross-env SLS_INTERACTIVE_DISABLED=1 SLS_TELEMETRY_DISABLED=1 npx serverless package",
-    "deploy": "cross-env SLS_INTERACTIVE_DISABLED=1 SLS_TELEMETRY_DISABLED=1 npx serverless deploy",
     "start": "node index.js"
   },
-  "devDependencies": {
-    "cross-env": "^7.0.3",
-    "eslint": "^8.57.0",
-    "jest": "^29.7.0",
-    "serverless": "^3.40.0"
-  },
-  "jest": {
-    "testEnvironment": "node",
-    "verbose": true
-  }
+  "dependencies": {}
 }

@@ -2,18 +2,15 @@
 const path = require("path");
 
 async function loadModule() {
-  // Try CommonJS first
   try {
     const m = require(path.join(__dirname, "..", "index.js"));
     return { mod: m, type: "cjs" };
   } catch (e) {
-    // Try dynamic import (ESM)
     try {
       const fileUrl = path.join(__dirname, "..", "index.js");
       const imported = await import(fileUrlToImportPath(fileUrl));
       return { mod: imported, type: "esm" };
     } catch (ie) {
-      // rethrow original error for debugging
       const error = new Error("Failed to load index.js as CJS or ESM");
       error.cause = { cjsErr: e && e.message, esmErr: ie && ie.message };
       throw error;
@@ -21,9 +18,7 @@ async function loadModule() {
   }
 }
 
-// convert local path to import-able URL for dynamic import
 function fileUrlToImportPath(p) {
-  // Works for Windows and *nix
   const resolved = path.resolve(p);
   if (process.platform === "win32") {
     return "file:///" + resolved.replace(/\\/g, "/");
@@ -39,18 +34,10 @@ function tryParseBody(body) {
 }
 
 function normalizeHandlerFromModule(mod) {
-  // possible shapes:
-  // module.exports = fn
-  // exports.handler = fn
-  // export default fn
-  // export const handler = fn
   if (!mod) return null;
-  // if module has default as function, use it
   if (typeof mod === "function") return mod;
   if (mod.default && typeof mod.default === "function") return mod.default;
-  // check named handler
   if (mod.handler && typeof mod.handler === "function") return mod.handler;
-  // sometimes exported as 'main' or 'lambdaHandler'
   if (mod.main && typeof mod.main === "function") return mod.main;
   if (mod.lambdaHandler && typeof mod.lambdaHandler === "function") return mod.lambdaHandler;
   return null;
@@ -80,17 +67,14 @@ module.exports = async (req, res) => {
 
     const context = {};
 
-    // call handler: support callback (3 args) and promise/async (2 args)
     const result = await new Promise((resolve, reject) => {
       try {
         if (lambdaHandler.length >= 3) {
-          // callback style: (event, context, callback)
           lambdaHandler(event, context, (err, data) => {
             if (err) reject(err);
             else resolve(data);
           });
         } else {
-          // promise/async style
           Promise.resolve(lambdaHandler(event, context)).then(resolve).catch(reject);
         }
       } catch (callErr) {
@@ -98,18 +82,15 @@ module.exports = async (req, res) => {
       }
     });
 
-    // normalize result
     const statusCode = (result && result.statusCode) ? result.statusCode : 200;
     const headers = (result && result.headers) ? result.headers : { "content-type": "application/json" };
     let body = (result && result.body) ? result.body : result;
     if (typeof body === "object") body = JSON.stringify(body);
 
-    // set headers
     Object.entries(headers).forEach(([k, v]) => res.setHeader(k, v));
     res.status(statusCode).send(body);
   } catch (err) {
     console.error("Adapter error:", err && err.message ? err.message : err);
-    // include cause if present (useful for debugging load errors)
     const cause = err && err.cause ? err.cause : undefined;
     res.status(500).json({ error: "adapter_error", message: err && err.message ? err.message : String(err), cause });
   }

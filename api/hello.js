@@ -1,3 +1,3 @@
-﻿module.exports = function handler(req, res) {
+﻿module.exports = (req, res) => {
   res.json({ ok: true, now: new Date().toISOString() });
 };
