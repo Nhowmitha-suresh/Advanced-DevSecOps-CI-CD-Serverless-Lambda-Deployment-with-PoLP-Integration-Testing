@@ -1,10 +1,9 @@
-﻿{
-  "name": "serverless-api-clean",
+{
+  "name": "serverless-api",
   "version": "1.0.0",
-  "description": "Minimal serverless adapter for Vercel + Lambda handler",
+  "description": "Clean Vercel serverless API",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
-  },
-  "dependencies": {}
+  }
 }
