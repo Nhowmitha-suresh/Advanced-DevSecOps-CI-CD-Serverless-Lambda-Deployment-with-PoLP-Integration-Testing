@@ -1,0 +1,20 @@
+{
+  "name": "serverless-ci-cd-api",
+  "version": "1.0.0",
+  "description": "A simple API for CI/CD demonstration.",
+  "main": "index.js",
+  "scripts": {
+    "test": "node index.test.js",
+    "lint": "echo 'Skipping linting for brevity...'"
+  },
+  "keywords": [
+    "lambda",
+    "serverless",
+    "ci/cd"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "jest": "^29.7.0"
+  }
+}

@@ -1,0 +1,55 @@
+name: CD - Promote to Production
+
+on:
+  push:
+    tags: 
+      - 'v*.*.*' # Trigger only on tags (e.g., v1.0.0)
+
+env:
+  PROD_FUNCTION_NAME: serverless-production-api # Name of the existing Production Lambda function
+  REGION: us-east-1 # Target AWS Region
+  ZIP_FILE: deployment_package.zip # Artifact filename
+
+jobs:
+  promote_to_production:
+    runs-on: ubuntu-latest
+    
+    # 🛑 Target the Production environment and enforces manual review
+    environment: 
+      name: Production
+      
+    steps:
+      - name: 1. Checkout Code
+        uses: actions/checkout@v4
+      
+      - name: 2. Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: 3. Install dependencies
+        run: npm ci # Must reinstall dependencies as artifacts were not passed
+      
+      - name: 4. Configure AWS Credentials (Narrow Policy)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.REGION }}
+
+      - name: 5. Package Application Artifact
+        # Package code associated with the official tag
+        run: zip -r ${{ env.ZIP_FILE }} . -x '*.git*' '*.github*'
+
+      - name: 6. Deploy to Production (AWS CLI)
+        run: |
+          echo "Starting production deployment for tag ${{ github.ref_name }}"
+          
+          # Update function code with the tagged artifact
+          aws lambda update-function-code \
+            --function-name ${{ env.PROD_FUNCTION_NAME }} \
+            --zip-file fileb://${{ env.ZIP_FILE }} \
+            --region ${{ env.REGION }} \
+            --publish # Publishes a new version (best practice)
+          
+          echo "✅ Production deployment complete for version: ${{ github.ref_name }}"

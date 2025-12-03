@@ -1,0 +1,5 @@
+node_modules/
+.serverless/
+coverage/
+npm-debug.log
+yarn-error.log

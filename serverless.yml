@@ -1,0 +1,14 @@
+service: serverless-ci-cd-api
+frameworkVersion: '3'
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+
+functions:
+  api:
+    handler: index.handler
+    events:
+      - httpApi:
+          path: /
+          method: GET
