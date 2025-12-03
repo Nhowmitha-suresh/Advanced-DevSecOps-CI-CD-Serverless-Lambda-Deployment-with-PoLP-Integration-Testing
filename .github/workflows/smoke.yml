@@ -1,9 +1,9 @@
-name: Smoke test - confirm Actions runs
+﻿name: Smoke test - confirm Actions runs
 
 on:
   push:
     branches:
-      - main
+      - master
   workflow_dispatch:
 
 jobs:
@@ -20,9 +20,9 @@ jobs:
 
       - name: Print debug info
         run: |
-          echo "GITHUB_REPOSITORY = $GITHUB_REPOSITORY"
-          echo "GITHUB_REF = $GITHUB_REF"
-          echo "GITHUB_SHA = $GITHUB_SHA"
+          echo "GITHUB_REPOSITORY = "
+          echo "GITHUB_REF = "
+          echo "GITHUB_SHA = "
           echo "Listing root files:"
           ls -la
           echo "cat package.json (first 40 lines):"
