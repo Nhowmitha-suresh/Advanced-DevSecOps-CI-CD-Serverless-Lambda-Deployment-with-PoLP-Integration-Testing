@@ -1,57 +1,116 @@
-// api/lambda.js
-// Adapter: turns an AWS-Lambda-style handler (from index.js) into a Vercel HTTP handler.
-// Uses index.js (your package.json "main"). Adjust require path if your handler file changes.
+﻿// api/lambda.js - robust adapter for Vercel (supports CJS and ESM index.js handlers)
+const path = require("path");
 
-const lambdaModule = require('../index.js'); // matches "main": "index.js" in your package.json
-const lambdaHandler = lambdaModule.handler || lambdaModule.default || lambdaModule;
+async function loadModule() {
+  // Try CommonJS first
+  try {
+    const m = require(path.join(__dirname, "..", "index.js"));
+    return { mod: m, type: "cjs" };
+  } catch (e) {
+    // Try dynamic import (ESM)
+    try {
+      const fileUrl = path.join(__dirname, "..", "index.js");
+      const imported = await import(fileUrlToImportPath(fileUrl));
+      return { mod: imported, type: "esm" };
+    } catch (ie) {
+      // rethrow original error for debugging
+      const error = new Error("Failed to load index.js as CJS or ESM");
+      error.cause = { cjsErr: e && e.message, esmErr: ie && ie.message };
+      throw error;
+    }
+  }
+}
 
-// helper to parse JSON body safely
+// convert local path to import-able URL for dynamic import
+function fileUrlToImportPath(p) {
+  // Works for Windows and *nix
+  const resolved = path.resolve(p);
+  if (process.platform === "win32") {
+    return "file:///" + resolved.replace(/\\/g, "/");
+  } else {
+    return "file://" + resolved;
+  }
+}
+
 function tryParseBody(body) {
   if (!body) return null;
-  if (typeof body === 'object') return body;
+  if (typeof body === "object") return body;
   try { return JSON.parse(body); } catch { return body; }
 }
 
+function normalizeHandlerFromModule(mod) {
+  // possible shapes:
+  // module.exports = fn
+  // exports.handler = fn
+  // export default fn
+  // export const handler = fn
+  if (!mod) return null;
+  // if module has default as function, use it
+  if (typeof mod === "function") return mod;
+  if (mod.default && typeof mod.default === "function") return mod.default;
+  // check named handler
+  if (mod.handler && typeof mod.handler === "function") return mod.handler;
+  // sometimes exported as 'main' or 'lambdaHandler'
+  if (mod.main && typeof mod.main === "function") return mod.main;
+  if (mod.lambdaHandler && typeof mod.lambdaHandler === "function") return mod.lambdaHandler;
+  return null;
+}
+
 module.exports = async (req, res) => {
-  const event = {
-    httpMethod: req.method,
-    path: req.url.split('?')[0],
-    headers: req.headers || {},
-    queryStringParameters: Object.keys(req.query || {}).reduce((acc, k) => {
-      acc[k] = Array.isArray(req.query[k]) ? req.query[k][0] : req.query[k];
-      return acc;
-    }, {}),
-    body: tryParseBody(req.body),
-    isBase64Encoded: false
-  };
-
-  const context = {}; // minimal stub
-
   try {
+    const { mod } = await loadModule();
+    const lambdaHandler = normalizeHandlerFromModule(mod);
+    if (!lambdaHandler) {
+      console.error("No handler function found in ../index.js. Module keys:", Object.keys(mod || {}));
+      res.status(500).json({ error: "No handler found in index.js", keys: Object.keys(mod || {}) });
+      return;
+    }
+
+    const event = {
+      httpMethod: req.method,
+      path: (req.url || "").split("?")[0],
+      headers: req.headers || {},
+      queryStringParameters: Object.keys(req.query || {}).reduce((acc, k) => {
+        acc[k] = Array.isArray(req.query[k]) ? req.query[k][0] : req.query[k];
+        return acc;
+      }, {}),
+      body: tryParseBody(req.body),
+      isBase64Encoded: false,
+    };
+
+    const context = {};
+
+    // call handler: support callback (3 args) and promise/async (2 args)
     const result = await new Promise((resolve, reject) => {
-      // callback style (event, context, callback)
-      if (lambdaHandler.length >= 3) {
-        lambdaHandler(event, context, (err, data) => {
-          if (err) reject(err);
-          else resolve(data);
-        });
-      } else {
-        // promise/async style
-        Promise.resolve(lambdaHandler(event, context)).then(resolve).catch(reject);
+      try {
+        if (lambdaHandler.length >= 3) {
+          // callback style: (event, context, callback)
+          lambdaHandler(event, context, (err, data) => {
+            if (err) reject(err);
+            else resolve(data);
+          });
+        } else {
+          // promise/async style
+          Promise.resolve(lambdaHandler(event, context)).then(resolve).catch(reject);
+        }
+      } catch (callErr) {
+        reject(callErr);
       }
     });
 
-    // support Lambda-style response { statusCode, headers, body }
+    // normalize result
     const statusCode = (result && result.statusCode) ? result.statusCode : 200;
-    const headers = (result && result.headers) ? result.headers : { 'content-type': 'application/json' };
+    const headers = (result && result.headers) ? result.headers : { "content-type": "application/json" };
     let body = (result && result.body) ? result.body : result;
+    if (typeof body === "object") body = JSON.stringify(body);
 
-    if (typeof body === 'object') body = JSON.stringify(body);
-
+    // set headers
     Object.entries(headers).forEach(([k, v]) => res.setHeader(k, v));
     res.status(statusCode).send(body);
   } catch (err) {
-    console.error('Lambda adapter error:', err);
-    res.status(500).json({ error: 'Internal Server Error', message: err && err.message ? err.message : String(err) });
+    console.error("Adapter error:", err && err.message ? err.message : err);
+    // include cause if present (useful for debugging load errors)
+    const cause = err && err.cause ? err.cause : undefined;
+    res.status(500).json({ error: "adapter_error", message: err && err.message ? err.message : String(err), cause });
   }
 };
