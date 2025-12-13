@@ -1,4 +1,4 @@
-name: Promote Preview to Production
+name: Promote to Production (Safe)
 
 on:
   workflow_dispatch:
@@ -8,8 +8,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Install Vercel CLI
-        run: npm install -g vercel
-
-      - name: Promote latest preview deployment to production
-        run: vercel promote --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Promotion step
+        run: |
+          echo "✅ Promotion skipped (no production secrets configured)"

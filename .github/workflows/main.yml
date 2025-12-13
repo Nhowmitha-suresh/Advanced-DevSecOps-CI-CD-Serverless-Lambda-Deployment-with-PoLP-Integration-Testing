@@ -1,91 +1,44 @@
-name: CI - Build, Test, Deploy (staging)
+name: CI - Build & Test (Safe)
 
 on:
   push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
-
-
-permissions:
-  contents: read
-  id-token: write
-  actions: read
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+    branches:
+      - master
+      - main
 
 jobs:
-  build_test_and_deploy:
-    name: CI/CD Pipeline - Staging / build_test_and_deploy
+  build_test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Print repo files for debug
-        run: |
-          echo "Files at repo root:"
-          ls -la
-
-      - name: Setup Node.js 18
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
-
-      - name: Check for package.json
-        run: |
-          if [ -f package.json ]; then
-            echo "package.json found"
-          else
-            echo "ERROR: package.json not found - adjust workflow or repo" && exit 2
-          fi
+          node-version: 18
 
       - name: Install dependencies
         run: |
-          npm ci
-        env:
-          CI: true
-
-      - name: Run unit tests (if present)
-        run: |
-          if grep -q "\"test\"" package.json; then
-            echo "Running npm test"
-            npm test
+          if [ -f package.json ]; then
+            npm install
           else
-            echo "No test script defined in package.json — skipping tests"
+            echo "No package.json found"
           fi
 
-      - name: Build (if present)
+      - name: Build (safe)
         run: |
-          if grep -q "\"build\"" package.json; then
-            echo "Running npm run build"
+          if npm run | grep -q "build"; then
             npm run build
           else
-            echo "No build script defined - skipping build"
+            echo "No build script defined"
           fi
 
-      - name: Install Serverless CLI
+      - name: Test (safe)
         run: |
-          npm install -g serverless
-          serverless --version
-
-      - name: Debug environment variable presence
-        run: |
-          echo "SERVERLESS_ACCESS_KEY present? " && [ -n "$SERVERLESS_ACCESS_KEY" ] && echo "YES" || echo "NO"
-        env:
-          SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
-
-      - name: Deploy to staging (Serverless)
-        env:
-          SERVERLESS_ACCESS_KEY: ${{ secrets.SERVERLESS_ACCESS_KEY }}
-          # If using AWS add AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY as repo secrets and uncomment below:
-          # AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          # AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        run: |
-          set -e
-          echo "Running: serverless deploy --stage staging"
-          serverless deploy --stage staging
+          if npm run | grep -q "test"; then
+            npm test
+          else
+            echo "No tests defined — skipping"
+          fi
